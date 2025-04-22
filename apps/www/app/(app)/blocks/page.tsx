@@ -1,28 +1,33 @@
-import * as React from "react"
-import { unstable_cache } from "next/cache"
+import Link from "next/link"
 
-import { getAllBlockIds } from "@/lib/blocks"
 import { BlockDisplay } from "@/components/block-display"
+import { Button } from "@/registry/new-york/ui/button"
 
-const BLOCKS_WHITELIST_PREFIXES = ["sidebar", "login"]
-
-const getBlocks = unstable_cache(async () => {
-  return (await getAllBlockIds()).filter((name) =>
-    BLOCKS_WHITELIST_PREFIXES.some((prefix) => name.startsWith(prefix))
-  )
-}, ["blocks"])
+const FEATURED_BLOCKS = [
+  "dashboard-01",
+  "sidebar-07",
+  "sidebar-03",
+  "login-03",
+  "login-04",
+]
 
 export default async function BlocksPage() {
-  const blocks = await getBlocks()
-
   return (
-    <div className="gap-3 md:flex md:flex-row-reverse md:items-start">
-      <div className="grid flex-1 gap-12 md:gap-24 lg:gap-48">
-        {blocks.map((name, index) => (
-          <React.Suspense key={`${name}-${index}`}>
-            <BlockDisplay name={name} />
-          </React.Suspense>
-        ))}
+    <div>
+      {FEATURED_BLOCKS.map((block) => (
+        <div
+          key={block}
+          className="border-grid container border-b py-8 first:pt-6 last:border-b-0 md:py-12"
+        >
+          <BlockDisplay name={block} />
+        </div>
+      ))}
+      <div className="container-wrapper">
+        <div className="container flex justify-center py-6">
+          <Button asChild variant="outline">
+            <Link href="/blocks/sidebar">Browse all blocks</Link>
+          </Button>
+        </div>
       </div>
     </div>
   )

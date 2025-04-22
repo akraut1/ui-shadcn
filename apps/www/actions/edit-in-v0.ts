@@ -2,43 +2,11 @@
 
 import { track } from "@vercel/analytics/server"
 import { capitalCase } from "change-case"
-import { z } from "zod"
 
+import { getRegistryItem } from "@/lib/registry"
 import { Style } from "@/registry/registry-styles"
-import { registryEntrySchema, registryItemTypeSchema } from "@/registry/schema"
 
-async function getRegistryItem(name: string, style: Style["name"]) {
-  const registryURL = new URL(
-    `${process.env.NEXT_PUBLIC_APP_URL}/r/styles/${style}/${name}.json`
-  )
-  const response = await fetch(registryURL)
-
-  if (!response.ok) {
-    return null
-  }
-
-  const data = await response.json()
-
-  const result = registryEntrySchema
-    .extend({
-      files: z.array(
-        z.object({
-          path: z.string(),
-          content: z.string().optional(),
-          type: registryItemTypeSchema,
-          target: z.string().optional(),
-        })
-      ),
-    })
-    .safeParse(data)
-
-  if (!result.success) {
-    console.error(result.error)
-    return null
-  }
-
-  return result.data
-}
+const TAILWIND_CONFIG_BLOCKS = ["dashboard-01"]
 
 export async function editInV0({
   name,
@@ -65,22 +33,31 @@ export async function editInV0({
       url,
     })
 
-    // const payload = {
-    //   title: registryItem.name,
-    //   description: registryItem.description ?? registryItem.name,
-    //   code: registryItem.files?.[0]?.content,
-    //   source: {
-    //     title: "shadcn/ui",
-    //     url,
-    //   },
-    //   meta: {
-    //     project: capitalCase(name.replace(/\d+/g, "")),
-    //     file: `${name}.tsx`,
-    //   },
-    // }
-
     // Remove v0 prefix from the name
     registryItem.name = registryItem.name.replace(/^v0-/, "")
+
+    const projectName = capitalCase(name.replace(/\d+/g, ""))
+    registryItem.description = registryItem.description || projectName
+
+    // Replace `@/registry/new-york/` in files.
+    registryItem.files = registryItem.files?.map((file) => {
+      if (file.content?.includes("@/registry/new-york/ui")) {
+        file.content = file.content?.replaceAll(
+          "@/registry/new-york/ui",
+          "@/components/ui"
+        )
+      }
+      return file
+    })
+
+    if (TAILWIND_CONFIG_BLOCKS.includes(name)) {
+      registryItem.files?.push({
+        path: "tailwind.config.js",
+        type: "registry:file",
+        target: "tailwind.config.js",
+        content: TAILWIND_CONFIG,
+      })
+    }
 
     const payload = {
       version: 2,
@@ -90,7 +67,7 @@ export async function editInV0({
         url,
       },
       meta: {
-        project: capitalCase(name.replace(/\d+/g, "")),
+        project: projectName,
         file: `${name}.tsx`,
       },
     }
@@ -129,3 +106,100 @@ export async function editInV0({
     }
   }
 }
+
+const TAILWIND_CONFIG = `const { fontFamily } = require("tailwindcss/defaultTheme")
+
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  darkMode: ["class"],
+  content: ["app/**/*.{ts,tsx}", "components/**/*.{ts,tsx}"],
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ["var(--font-geist-sans)", ...fontFamily.sans],
+        mono: ["var(--font-geist-mono)", ...fontFamily.mono],
+      },
+      colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive) / <alpha-value>)",
+          foreground: "hsl(var(--destructive-foreground) / <alpha-value>)",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+  			chart: {
+  				'1': 'hsl(var(--chart-1))',
+  				'2': 'hsl(var(--chart-2))',
+  				'3': 'hsl(var(--chart-3))',
+  				'4': 'hsl(var(--chart-4))',
+  				'5': 'hsl(var(--chart-5))'
+  			},
+        sidebar: {
+          DEFAULT: "hsl(var(--sidebar-background))",
+          foreground: "hsl(var(--sidebar-foreground))",
+          primary: "hsl(var(--sidebar-primary))",
+          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
+          accent: "hsl(var(--sidebar-accent))",
+          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
+          border: "hsl(var(--sidebar-border))",
+          ring: "hsl(var(--sidebar-ring))",
+        },
+      },
+      borderRadius: {
+        xl: "calc(var(--radius) + 4px)",
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        "caret-blink": {
+          "0%,70%,100%": { opacity: "1" },
+          "20%,50%": { opacity: "0" },
+        },
+      },
+      animation: {
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+        "caret-blink": "caret-blink 1.25s ease-out infinite",
+      },
+    },
+  },
+  plugins: [
+    require("tailwindcss-animate"),
+    require("@tailwindcss/container-queries"),
+  ],
+}`
